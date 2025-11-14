@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "918100959796",
+    "project_id": "pairup-fb9b3",
+    "storage_bucket": "pairup-fb9b3.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:918100959796:android:e9e14faa8430c8e0172061",
+        "android_client_info": {
+          "package_name": "com.angelcabrera.proyecto"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBZpDbgqVRRMWrwKiqXDBf4b0vgtVrL5Y4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
