@@ -1,6 +1,5 @@
 package com.angelcabrera.proyecto.navigation
 
-import PairUpScreen
 import SearchScreen
 import android.annotation.SuppressLint
 import androidx.compose.runtime.Composable

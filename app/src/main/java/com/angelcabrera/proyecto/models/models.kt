@@ -20,9 +20,8 @@ data class Testimonial(
     val stars: Int
 )
 
-data class UserProgress(
-    val sessions: Int = 0,
-    val minutes: Int = 0,
-    val level: String = "Principiante",
-    val recent: List<String> = emptyList()
+data class ProgressInfo(
+    val sessionsCompleted: Int = 0,
+    val mentorsReceived: Int = 0,
+    val minutes: Int = 0
 )
