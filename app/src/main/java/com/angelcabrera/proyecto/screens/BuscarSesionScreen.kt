@@ -23,7 +23,7 @@ fun BuscarSesionScreen(navController: NavController) {
     var userRole by remember { mutableStateOf("") }
     var sesiones by remember { mutableStateOf<List<Pair<String, Map<String, Any>>>>(emptyList()) }
 
-
+    // 1️⃣ Obtener rol del usuario
     LaunchedEffect(Unit) {
         db.collection("users").document(userId).get()
             .addOnSuccessListener { doc ->
@@ -31,17 +31,16 @@ fun BuscarSesionScreen(navController: NavController) {
             }
     }
 
-    // 2. Cargar sesiones activas según rol
+    // 2️⃣ Cargar sesiones activas
     LaunchedEffect(userRole) {
         if (userRole.isNotEmpty()) {
             db.collection("sessions")
                 .whereEqualTo("active", true)
                 .get()
                 .addOnSuccessListener { snapshot ->
-                    val lista = snapshot.documents.map { doc ->
-                        doc.id to (doc.data ?: emptyMap<String, Any>())
+                    sesiones = snapshot.documents.map { doc ->
+                        doc.id to (doc.data ?: emptyMap())
                     }
-                    sesiones = lista
                 }
         }
     }
@@ -65,7 +64,7 @@ fun BuscarSesionScreen(navController: NavController) {
                 val navigator = data["navigator"] as? String
                 val prof = data["professor"] as? String
 
-
+                // 3️⃣ Ver disponibilidad según el rol del usuario
                 val disponible = when (userRole) {
                     "Driver" -> navigator == null || navigator == ""
                     "Navigator" -> navigator == null || navigator == ""
@@ -113,7 +112,7 @@ fun BuscarSesionScreen(navController: NavController) {
 
         Spacer(Modifier.height(24.dp))
 
-        // BOTÓN PARA CREAR UNA NUEVA SESIÓN
+        // 4️⃣ Crear nueva sesión
         Button(
             onClick = {
                 crearSesionNueva(
@@ -132,9 +131,9 @@ fun BuscarSesionScreen(navController: NavController) {
 }
 
 
-
-
-
+/* ---------------------------------------------------------
+   🔵 FUNCIÓN: Unir usuario a la sesión según su rol
+--------------------------------------------------------- */
 
 fun unirUsuarioASesion(
     db: FirebaseFirestore,
@@ -158,9 +157,9 @@ fun unirUsuarioASesion(
 }
 
 
-
-
-
+/* ---------------------------------------------------------
+   🟢 FUNCIÓN: Crear nueva sesión
+--------------------------------------------------------- */
 
 fun crearSesionNueva(
     db: FirebaseFirestore,
@@ -178,6 +177,7 @@ fun crearSesionNueva(
         "professor" to null
     )
 
+    // role.lowercase() = "driver", "navigator", "profesor"
     data[role.lowercase()] = userId
 
     db.collection("sessions").document(sessionId)

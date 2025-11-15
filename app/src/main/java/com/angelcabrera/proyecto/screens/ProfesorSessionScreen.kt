@@ -5,16 +5,22 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Chat
+import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.Done
+import androidx.compose.material.icons.filled.InsertComment
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-
-// Firebase
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -22,32 +28,60 @@ fun ProfesorSessionScreen(
     navController: NavController,
     sessionId: String
 ) {
+
     val db = FirebaseFirestore.getInstance()
     val auth = FirebaseAuth.getInstance()
     val teacherId = auth.currentUser?.uid ?: ""
 
+    // ESTADOS
+    var code by remember { mutableStateOf("") }
+    var notes by remember { mutableStateOf("") }
+    var evaluation by remember { mutableStateOf("") }
     var feedback by remember { mutableStateOf("") }
-    var teacherNotes by remember { mutableStateOf("") }
-    var evaluation by remember { mutableStateOf("Sin evaluar") }
-    var chatMessage by remember { mutableStateOf("") }
+    var message by remember { mutableStateOf("") }
 
-    var chatMessages by remember { mutableStateOf(listOf<String>()) }
+    var messages by remember { mutableStateOf(listOf<String>()) }
+    var driverName by remember { mutableStateOf("Cargando...") }
+    var navigatorName by remember { mutableStateOf("Cargando...") }
 
-    // 🔥 Escuchar mensajes del chat en tiempo real
+    // 🔥 1. Cargar información de la sesión
     LaunchedEffect(true) {
-        db.collection("sessions")
-            .document(sessionId)
-            .collection("chat")
-            .orderBy("timestamp")
+        db.collection("sessions").document(sessionId)
+            .addSnapshotListener { snap, _ ->
+                if (snap != null && snap.exists()) {
+                    code = snap.getString("code") ?: ""
+                    val driverId = snap.getString("driver") ?: ""
+                    val navId = snap.getString("navigator") ?: ""
+
+                    if (driverId.isNotEmpty()) {
+                        db.collection("users").document(driverId).get()
+                            .addOnSuccessListener { driverName = it.getString("name") ?: "Driver" }
+                    }
+                    if (navId.isNotEmpty()) {
+                        db.collection("users").document(navId).get()
+                            .addOnSuccessListener { navigatorName = it.getString("name") ?: "Navigator" }
+                    }
+                }
+            }
+    }
+
+    // 🔥 2. Chat privado del profesor
+    LaunchedEffect(true) {
+        db.collection("sessions").document(sessionId)
+            .collection("profChat")
+            .orderBy("timestamp", Query.Direction.ASCENDING)
             .addSnapshotListener { value, _ ->
-                val list = value?.documents?.mapNotNull { it.getString("text") } ?: emptyList()
-                chatMessages = list
+                messages = value?.documents?.map { it.getString("text") ?: "" } ?: emptyList()
             }
     }
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Panel del Profesor") })
+            TopAppBar(
+                title = {
+                    Text("Panel del Profesor")
+                }
+            )
         }
     ) { padding ->
 
@@ -56,176 +90,187 @@ fun ProfesorSessionScreen(
                 .padding(padding)
                 .padding(16.dp)
                 .verticalScroll(rememberScrollState())
-                .fillMaxSize()
         ) {
 
-            // ------------------------------------
-            // CÓDIGO DEL ALUMNO (simulado)
-            // ------------------------------------
-            Text("Vista del código del alumno", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(8.dp))
+            //--------------------------------------
+            // INFORMACIÓN DE LA SESIÓN
+            //--------------------------------------
+            Text("Participantes", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(6.dp))
+
+            Text("Driver: $driverName", fontWeight = FontWeight.Bold)
+            Text("Navigator: $navigatorName")
+
+            Spacer(Modifier.height(20.dp))
+
+            //--------------------------------------
+            // CÓDIGO DEL ALUMNO
+            //--------------------------------------
+            Text("Código del alumno", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(6.dp))
 
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(160.dp),
-                shape = RoundedCornerShape(10.dp)
+                    .height(200.dp),
+                colors = CardDefaults.cardColors(Color(0xFF1E1E1E))
             ) {
                 Box(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color(0xFFEFEFEF))
                         .padding(12.dp)
+                        .fillMaxSize()
                 ) {
-                    Text("Aquí se mostraría el código del alumno en tiempo real...")
+                    Text(
+                        code.ifEmpty { "// Sin código aún..." },
+                        color = Color.White
+                    )
                 }
             }
 
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(25.dp))
 
-            // ------------------------------------
+            //--------------------------------------
             // NOTAS DEL PROFESOR
-            // ------------------------------------
+            //--------------------------------------
             Text("Notas del profesor", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(6.dp))
 
             OutlinedTextField(
-                value = teacherNotes,
-                onValueChange = { teacherNotes = it },
+                value = notes,
+                onValueChange = { notes = it },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Anotaciones del profesor") }
+                placeholder = { Text("Escribe tus notas...") }
             )
 
             Button(
                 onClick = {
-                    db.collection("sessions")
-                        .document(sessionId)
+                    db.collection("sessions").document(sessionId)
                         .collection("evaluation")
                         .document("notes")
-                        .set(mapOf("text" to teacherNotes))
+                        .set(mapOf("text" to notes))
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Guardar notas")
             }
 
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(25.dp))
 
-            // ------------------------------------
-            // EVALUACIÓN DEL ALUMNO
-            // ------------------------------------
-            Text("Evaluación del alumno", style = MaterialTheme.typography.titleMedium)
+            //--------------------------------------
+            // EVALUACIÓN
+            //--------------------------------------
+            Text("Evaluación del estudiante", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(8.dp))
+
+            val options = listOf("Excelente", "Bueno", "Regular", "Deficiente")
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                val options = listOf("Excelente", "Bueno", "Regular", "Deficiente")
-                options.forEach { option ->
+                options.forEach { opt ->
                     FilterChip(
-                        selected = evaluation == option,
+                        selected = evaluation == opt,
                         onClick = {
-                            evaluation = option
-                            db.collection("sessions")
-                                .document(sessionId)
+                            evaluation = opt
+                            db.collection("sessions").document(sessionId)
                                 .collection("evaluation")
-                                .document("status")
-                                .set(mapOf("value" to option))
+                                .document("score")
+                                .set(mapOf("value" to opt))
                         },
-                        label = { Text(option) }
+                        label = { Text(opt) }
                     )
                 }
             }
 
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(25.dp))
 
-            // ------------------------------------
+            //--------------------------------------
             // FEEDBACK FINAL
-            // ------------------------------------
+            //--------------------------------------
             Text("Feedback final", style = MaterialTheme.typography.titleMedium)
 
             OutlinedTextField(
                 value = feedback,
                 onValueChange = { feedback = it },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Comentarios finales") },
-                maxLines = 4
+                maxLines = 4,
+                placeholder = { Text("Escribe un feedback detallado...") }
             )
 
             Button(
                 onClick = {
-                    db.collection("sessions")
-                        .document(sessionId)
+                    db.collection("sessions").document(sessionId)
                         .collection("evaluation")
                         .document("feedback")
                         .set(mapOf("text" to feedback))
                 },
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = Color.Black)
+                colors = ButtonDefaults.buttonColors(Color.Black)
             ) {
-                Text("Enviar feedback", color = Color.White)
+                Text("Enviar Feedback", color = Color.White)
             }
 
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(30.dp))
 
-            // ------------------------------------
+            //--------------------------------------
             // CHAT PRIVADO DEL PROFESOR
-            // ------------------------------------
-            Text("Chat del profesor", style = MaterialTheme.typography.titleMedium)
+            //--------------------------------------
+            Text("Chat privado del profesor", style = MaterialTheme.typography.titleMedium)
 
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(140.dp)
-                    .background(Color(0xFFEFEFEF))
+                    .height(160.dp)
+                    .background(Color(0xFFEDEDED), RoundedCornerShape(8.dp))
                     .padding(8.dp)
             ) {
-                chatMessages.forEach {
-                    Text("- $it")
+                messages.forEach { msg ->
+                    Text("• $msg")
                 }
             }
 
+            Spacer(Modifier.height(8.dp))
+
             Row {
                 OutlinedTextField(
-                    value = chatMessage,
-                    onValueChange = { chatMessage = it },
+                    value = message,
+                    onValueChange = { message = it },
                     modifier = Modifier.weight(1f)
                 )
 
                 Spacer(Modifier.width(8.dp))
 
-                Button(
-                    onClick = {
-                        if (chatMessage.isNotBlank()) {
-                            db.collection("sessions")
-                                .document(sessionId)
-                                .collection("chat")
-                                .add(
-                                    mapOf(
-                                        "text" to chatMessage,
-                                        "userId" to teacherId,
-                                        "timestamp" to System.currentTimeMillis()
-                                    )
+                Button(onClick = {
+                    if (message.isNotBlank()) {
+                        db.collection("sessions").document(sessionId)
+                            .collection("profChat")
+                            .add(
+                                mapOf(
+                                    "text" to message,
+                                    "teacherId" to teacherId,
+                                    "timestamp" to System.currentTimeMillis()
                                 )
-                            chatMessage = ""
-                        }
+                            )
+                        message = ""
                     }
-                ) {
+                }) {
                     Text("Enviar")
                 }
             }
 
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(30.dp))
 
-            // ------------------------------------
+            //--------------------------------------
             // FINALIZAR SESIÓN
-            // ------------------------------------
+            //--------------------------------------
             Button(
                 onClick = {
                     db.collection("sessions")
                         .document(sessionId)
-                        .update("status", "finalizada")
+                        .update("active", false)
 
                     navController.navigate("pairup")
                 },
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
+                colors = ButtonDefaults.buttonColors(Color.Red)
             ) {
                 Text("Finalizar sesión", color = Color.White)
             }
